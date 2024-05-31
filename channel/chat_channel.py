@@ -92,6 +92,19 @@ class ChatChannel(Channel):
                 logger.debug("[WX]self message skipped")
                 return None
 
+        # 处理群分享
+        if ctype == ContextType.SHARING and context.get("isgroup", False):
+            # 如果开启群分享白名单，则直接处理
+            group_name = context["msg"].other_user_nickname
+            group_name_sharing_white_list = config.get("group_name_sharing_white_list", [])
+            if ctype == ContextType.SHARING and any(
+                [
+                    "ALL_GROUP" in group_name_sharing_white_list,
+                    check_contain(group_name, group_name_sharing_white_list),
+                ]
+            ):
+                return context
+
         # 消息内容匹配过程，并处理content
         if ctype == ContextType.TEXT:
             if first_in and "」\n- - - - - - -" in content:  # 初次匹配 过滤引用消息
@@ -191,7 +204,7 @@ class ChatChannel(Channel):
         reply = e_context["reply"]
         if not e_context.is_pass():
             logger.debug("[WX] ready to handle context: type={}, content={}".format(context.type, context.content))
-            if context.type == ContextType.TEXT or context.type == ContextType.IMAGE_CREATE:  # 文字和图片消息
+            if context.type in [ContextType.TEXT, ContextType.IMAGE_CREATE, ContextType.SHARING]:  # 文字、分享和图片消息
                 context["channel"] = e_context["channel"]
                 reply = super().build_reply_content(context.content, context)
             elif context.type == ContextType.VOICE:  # 语音消息
@@ -228,8 +241,6 @@ class ChatChannel(Channel):
                 }
             elif context.type == ContextType.ACCEPT_FRIEND:  # 好友申请，匹配字符串
                 reply = self._build_friend_request_reply(context)
-            elif context.type == ContextType.SHARING:  # 分享信息，当前无默认逻辑
-                pass
             elif context.type == ContextType.FUNCTION or context.type == ContextType.FILE:  # 文件消息及函数调用等，当前无默认逻辑
                 pass
             else:
